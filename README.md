@@ -1,172 +1,125 @@
 # TennisHealth-AW
 
-Apple Watch 网球运动生理数据的自动化采集、分析与交互查询系统。
+[English](README.md) | [中文](README_CN.md)
 
-## 系统概述
+**Automated Physiological & Tactical Analysis for Tennis Enthusiasts via Apple Watch & AI.**
 
-本项目将 Apple Watch 的运动健康数据与 AI 分析能力相结合, 为网球爱好者提供两种使用模式:
+TennisHealth-AW bridges the gap between raw Apple Watch data and professional-grade tennis coaching. By leveraging LLMs (DeepSeek Reasoner), it transforms your heart rate, movement, and energy metrics into actionable tactical insights, delivered instantly after your match.
 
-1. **自动推送模式**: 后台守护进程监听 iCloud 新数据, 自动生成战术分析并推送至 OpenClaw (ClawdBot)。
-2. **交互查询模式**: 通过 Skill 文件教会 LLM 客户端直接读取和分析 iCloud 中的原始数据, 支持灵活的对话式复盘。
+---
 
-### 核心分析维度 (ATP 级)
+## Features
 
-系统不仅分析汇总数据, 还通过时序数据衍生出职业级的分析指标:
-- **TRIMP (训练冲量)**: 量化单场运动负荷, 评估身体真实压力。
-- **心率分区 (Zones)**: 统计 Zone 1/2/3 占比, 判断有氧/无氧训练分布。
-- **心率/步频比 (Cardiac Efficiency)**: 实时监测心血管效率, 识别疲劳引发的移动衰减。
-- **运动经济性**: 计算每步能量消耗, 评估体能利用效率。
-- **HRR1 (心率恢复)**: 结束后 1 分钟心率下降值, 评估心肺适能。
-- **SPM 时序**: 逐分钟步频分析, 定位场上跑动节奏的变化。
+### 1. Zero-Click Automation
+- **Auto-Sync**: Monitors iCloud for new workout exports from Health Auto Export.
+- **Auto-Analysis**: Automatically filters for "Tennis" workouts (>5 min) and triggers AI analysis.
+- **Push Notification**: Delivers a concise 5-point tactical report via OpenClaw (ClawdBot) immediately after play.
 
-### 球员画像
-- 左手持拍, 单手反拍
-- NTRP 4.0, 目标 4.5
-- 单/双打兼顾
+### 2. Pro-Level Sports Science (ATP Metrics)
+Goes beyond basic averages by deriving advanced metrics from time-series data:
+- **TRIMP (Training Impulse)**: Quantifies true physiological load.
+- **Cardiac Efficiency**: Tracks HR/Step ratio to detect fatigue-induced movement decay.
+- **Specific Power**: Analyzes energy cost per step (kJ/step) for movement economy.
+- **HRR (Heart Rate Recovery)**: Evaluates cardiovascular fitness via 1-minute recovery rates.
+- **SPM Analysis**: Time-series analysis of Steps Per Minute to pinpoint intensity drops.
 
-## 数据链路
+### 3. Interactive Coaching (LLM Skill)
+Feed the raw data to your LLM client (Cursor/Claude) to ask complex questions:
+> *"Compare my cardiac efficiency between the first and last set today."*
+> *"Did my recovery rate improve over the last 3 matches?"*
+
+---
+
+## Architecture
 
 ```
 Apple Watch  -->  iPhone HealthKit  -->  Health Auto Export  -->  iCloud JSON
-                  (蓝牙同步)              (自动导出)              (云盘存储)
+                  (Bluetooth)             (Auto-Export)           (Cloud Drive)
                                                                      |
                                              +-----------------------+
                                              |                       |
                                         daemon/                 skills/
-                                        (自动推送)              (交互查询)
+                                     (Auto-Push)           (Interactive)
                                              |                       |
-                                        DeepSeek AI                客户端
-                                             |                 (OpenClaw等)
-                                        OpenClaw 推送
+                                        DeepSeek AI            LLM Client
+                                             |              (Cursor/Claude)
+                                      OpenClaw Push
 ```
 
-## 项目结构
+## Project Structure
 
-```
-TennisHealth-AW/
-├── skills/                          # Skill 定义
-│   └── tennis_health/
-│       ├── skill.md                 # 数据查询与分析的完整 SOP
-│       └── config.yaml              # 技能元数据 (名称、权限、标签)
-├── tools/                           # 业务逻辑 (可被 daemon 和其他脚本复用)
-│   ├── workout_filter.py            # JSON 读取、网球记录筛选、UUID 去重
-│   └── ai_analyzer.py               # DeepSeek 单场战术分析 + 多场体能复盘
-├── daemon/                          # 守护进程 (给 OpenClaw 使用)
-│   └── health_monitor.py            # Watchdog 监听 + OpenClaw 推送
-├── examples/                        # 示例数据
-│   └── sample_workout.json          # 脱敏的 workout JSON 样例
-├── context/                         
-├── README.md
-├── requirements.txt               
-└── .gitignore                       # 运行时缓存 (gitignore)
-```
+| Directory | Description |
+|---|---|
+| `daemon/` | Background service for monitoring files and pushing notifications. |
+| `skills/` | **LLM Skill** definitions. `skill.md` teaches LLMs how to read & analyze your data. |
+| `tools/` | Core logic: `workout_filter.py` (ETL) and `ai_analyzer.py` (ATP Metrics & Prompting). |
+| `examples/`| Sample JSON data for testing and schema reference. |
 
-## 环境要求
+## Quick Start
 
+### Prerequisites
 - Python 3.10+
-- macOS (依赖 iCloud 同步和 TCC 兼容的 `cat` 回退机制)
+- macOS (Required for iCloud Drive access & TCC workaround)
 - [Health Auto Export](https://apps.apple.com/app/health-auto-export/id1115567461) (iPhone App)
 
-## 安装
+### Installation
 
-```bash
-cd /path/to/TennisHealth-AW
-pip install -r requirements.txt
-```
+1. Clone and install dependencies:
+   ```bash
+   git clone https://github.com/loremdai/TennisHealth-AW.git
+   cd TennisHealth-AW
+   pip install -r requirements.txt
+   ```
 
-## 配置
+2. Configure Environment:
+   ```bash
+   export DEEPSEEK_API_KEY="your_api_key_here"
+   ```
 
-### 环境变量
+3. Configure Paths:
+   Edit `daemon/health_monitor.py` variables (`ICLOUD_DIR`, `OPENCLAW_BIN`, etc.) to match your local setup.
 
-```bash
-export DEEPSEEK_API_KEY="your_api_key_here"
-```
+### Usage
 
-### 路径配置
-
-以下常量定义在 `daemon/health_monitor.py` 顶部, 需根据实际环境修改:
-
-| 常量 | 说明 |
-|---|---|
-| `ICLOUD_DIR` | Health Auto Export 的 iCloud 导出目录 |
-| `STATE_FILE` | 已处理记录的持久化状态路径 |
-| `OPENCLAW_BIN` | OpenClaw CLI 二进制路径 |
-| `NODE_BIN` | Node.js 二进制路径 |
-| `OPENCLAW_TARGET_ID` | 推送目标 ID |
-
-## 使用方式
-
-### 1. 自动推送模式 (守护进程)
-
-运行后台监控, 当 Apple Watch 记录新比赛并同步到 iCloud 后, 自动分析并推送:
-
+**Option A: Daemon Mode (Auto-Push)**
+Start the background monitor:
 ```bash
 python daemon/health_monitor.py
 ```
+*Tip: Use `nohup` or a LaunchAgent to keep it running.*
 
-建议通过 macOS LaunchAgent 配置为开机自启动。
+**Option B: Interactive Mode (LLM Skill)**
+1. Open this project in Cursor or Claude Desktop.
+2. The `skills/tennis_health/skill.md` file will guide the AI to answer your questions about your historical data.
 
-### 2. 交互查询模式 (LLM Skill)
+---
 
-`skills/tennis_health/skill.md` 包含了数据位置、JSON 结构、读取方式和分析场景的完整描述。LLM 客户端读取该文件后即可自主查询数据。
+## Analysis Dimensions
 
-典型对话示例:
-- "看看我 2026-02-08 打了几场球"
-- "计算今天每场比赛的 TRIMP 负荷, 看看哪场强度最大"
-- "对比一下第一场和最后一场的心率/步频比, 我累了吗?"
-- "分析最近三场的心率恢复 (HRR1) 趋势, 我的体能有进步吗?"
-- "今天下半场我的 SPM (步频) 是不是掉了很多?"
-- "这周我的 Zone 3 高强度练习占比是多少?"
+The AI analyzer is prompt-engineered to focus on 5+1 key dimensions:
 
-## 在 OpenClaw (ClawdBot) 中使用
+1. **Intensity & Load**: TRIMP, HR Zones (1/2/3), Dynamic Range.
+2. **Movement Efficiency**: SPM time-series, Cardiac Efficiency Index.
+3. **Energy Economy**: Energy cost per step, metabolic power distribution.
+4. **Recovery**: HRR1 (1-min recovery), inter-match recovery trends.
+5. **Tactics**: Left-handed/One-handed backhand specific advice based on physical status.
+6. **Cross-Match Decay**: (For multi-match days) Fatigue trend analysis.
 
-本项目与 [OpenClaw](https://github.com/nicepkg/openclaw) 深度集成, 实现"打完球自动收到分析报告"的闭环体验。
+---
 
-### 自动推送集成
+## Integration with OpenClaw
 
-守护进程在检测到新比赛后, 通过 OpenClaw CLI 推送 AI 分析报告:
+This project is designed to work seamlessly with [OpenClaw](https://github.com/nicepkg/openclaw).
 
-```
-Watchdog 检测新比赛 -> DeepSeek 生成战术分析 -> OpenClaw CLI 推送消息
-```
-
-推送内容包含:
-- **心率特征与强度**: TRIMP 负荷、Zone 分布、心率动态范围。
-- **移动效率**: 逐分钟步频 (SPM) 衰减分析、心率/步频比。
-- **能量分布**: 前后半场能量输出对比、运动经济性评估。
-- **心肺恢复**: HRR1 评估与心肺适能反馈。
-- **针对性建议**: 基于上述数据的个性化战术调整建议。
-
-### 配置步骤
-
-1. 安装 OpenClaw CLI:
+The `daemon` uses the OpenClaw CLI to push the analysis report to your preferred instant messenger app. Ensure you have OpenClaw installed and logged in:
 
 ```bash
 npm install -g openclaw
-```
-
-2. 登录并获取目标 ID:
-
-```bash
 openclaw login
 ```
 
-3. 修改 `daemon/health_monitor.py` 顶部的常量配置:
+---
 
-```python
-OPENCLAW_BIN = "/path/to/openclaw"
-NODE_BIN = "/path/to/node"
-OPENCLAW_TARGET_ID = "your_target_id"
-```
+## License
 
-4. 启动守护进程:
-
-```bash
-python daemon/health_monitor.py
-```
-
-## 数据格式
-
-Health Auto Export 导出的 JSON 文件的完整结构和字段说明见:
-- `skills/tennis_health/skill.md` (字段说明表)
-- `examples/sample_workout.json` (完整 JSON 样例)
+MIT
